@@ -3,14 +3,14 @@ import { MeasuredValue, UnitOfMeasure } from './UnitOfMeasure';
 import 'reflect-metadata';
 
 /**
- * Decorator for setters methods that converts to the unit of measure specified.
+ * Decorator for methods, which converts to the unit of measure specified in parameter decorators.
  *
- * The value and the unit to be converted from are set by the caller in the MeasuredValue argument.
+ * The value and the unit to be converted from are set by the caller in the MeasuredValue argument(s).
  *
- * The ConvertUnits decorator can be applied to a method, and the ToUnit to one or more parameters for example:
+ * The ConvertUnits decorator can be applied to a method, and the ToUnit to one or more parameters, for example:
  *
- * @ConvertUnits
- * public myFunction(@ToUnit(UnitOfMeasure.CELSIUS) temperature: TemperatureValue, @ToUnit(UnitOfMeasure.KILOMETERS) distance: DistanceValue) {
+ * @ConvertUnits()
+ * public myFunction(@ToUnit(UnitOfMeasure.CELSIUS) temperature: MeasuredValue, @ToUnit(UnitOfMeasure.KILOMETERS) distance: MeasuredValue) {
  *   ....
  * }
  *
@@ -21,6 +21,10 @@ import 'reflect-metadata';
 const defaultPrecision = 2;
 const converterDecorators = Symbol('ToUnit');
 
+/**
+ * This is a method decorator, to determine which parameters have ToUnit decorators, and do the conversion. This
+ * type of decorator behaves similarly to AOP in Java.
+ */
 export function ConvertUnits(): Function {
   return (target: Object, propertyName: string, descriptor: TypedPropertyDescriptor<any>) => {
     let origMethod: Function | undefined = descriptor.value;
@@ -30,6 +34,7 @@ export function ConvertUnits(): Function {
         // getting the metadata that was set up in ToUnit
         const toUnitParamMetadata: ToUnitParameterMetadata[] =
           Reflect.getOwnMetadata(converterDecorators, target, propertyName) || [];
+        // match up the decorated parameters, with the arguments passed into this method
         toUnitParamMetadata.forEach((paramMetadata, index, toUnitParamMetadata) => {
           const origArg = args[index];
           if (origArg.unit !== paramMetadata.toUnit) {
@@ -53,7 +58,7 @@ export interface ToUnitParameterMetadata {
 }
 
 /**
- * This is a parameter decorator, so that individual method params can be converted to different units of measure
+ * This is a parameter decorator, so that individual method params can be converted to different units of measure.
  *
  * @param toUnit - the unit to convert to
  * @param precision - optional precision

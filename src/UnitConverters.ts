@@ -16,6 +16,7 @@ import {
   convertMilesPerHourToKnots,
   convertMilesToKilometers,
   convertMilesToMeters,
+  convertMillimetersToInches,
   convertNauticalMilesToMeters,
 } from './UnitConversions';
 import { UnitOfMeasure } from './UnitOfMeasure';
@@ -56,6 +57,10 @@ export const toUnitConverters: ToUnitConverter[] = [
       { fromUnit: UnitOfMeasure.INCHES, convertFunction: convertInchesToFeet },
       { fromUnit: UnitOfMeasure.METERS, convertFunction: convertMetersToFeet },
     ],
+  },
+  {
+    toUnit: UnitOfMeasure.INCHES,
+    converters: [{ fromUnit: UnitOfMeasure.MILLIMETERS, convertFunction: convertMillimetersToInches }],
   },
   {
     toUnit: UnitOfMeasure.KILOMETERS,

@@ -1,5 +1,8 @@
 import {getNumericValue, roundToPrecision} from './MathFunctions';
 
+/**
+ * All of the unit conversions that will be done.
+ */
 export interface ConvertFunction {
 	(fromValue: number | string, precision?: number): number;
 }
