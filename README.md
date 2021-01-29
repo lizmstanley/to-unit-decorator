@@ -9,7 +9,7 @@ Use the decorator for setter methods as follows:
 ```
  @ConvertUnits()
  public myFunction(@ToUnit(UnitOfMeasure.FEET) val: MeasuredValue) {
-    console.log(val.val);	
+    console.log(val.value);	
  }
 ```
 

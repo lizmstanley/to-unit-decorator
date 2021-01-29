@@ -26,96 +26,97 @@ const converterDecorators = Symbol('ToUnit');
  * type of decorator behaves similarly to AOP in Java.
  */
 export function ConvertUnits(): Function {
-  return (target: Object, propertyName: string, descriptor: TypedPropertyDescriptor<any>) => {
-    let origMethod: Function | undefined = descriptor.value;
+    return (target: Object, propertyName: string, descriptor: TypedPropertyDescriptor<any>) => {
+        let origMethod: Function | undefined = descriptor.value;
 
-    descriptor.value = function (...args: any[]) {
-      if (origMethod !== undefined) {
-        // getting the metadata that was set up in ToUnit
-        const toUnitParamMetadata: ToUnitParameterMetadata[] =
-          Reflect.getOwnMetadata(converterDecorators, target, propertyName) || [];
-        // match up the decorated parameters, with the arguments passed into this method
-        toUnitParamMetadata.forEach((paramMetadata, index, toUnitParamMetadata) => {
-          const origArg = args[index];
-          if (origArg.unit !== paramMetadata.toUnit) {
-            let convertedVal: number | null = convertOrigArgVal(paramMetadata.toUnit, origArg, paramMetadata.precision);
-            if (convertedVal !== null) {
-              origArg.val = convertedVal;
+        descriptor.value = function (...args: any[]) {
+            if (origMethod !== undefined) {
+                // getting the metadata that was set up in ToUnit
+                const toUnitParamMetadata: ToUnitParameterMetadata[] =
+                    Reflect.getOwnMetadata(converterDecorators, target, propertyName) || [];
+                // match up the decorated parameters, with the arguments passed into this method
+                toUnitParamMetadata.forEach((paramMetadata, index, toUnitParamMetadata) => {
+                    const origArg = args[index];
+                    if (origArg.unit !== paramMetadata.toUnit) {
+                        let convertedVal: number | null = convertOrigArgVal(
+                            paramMetadata.toUnit,
+                            origArg,
+                            origArg.precision !== undefined ? origArg.precision : paramMetadata.precision,
+                        );
+                        if (convertedVal !== null) {
+                            origArg.value = convertedVal;
+                        }
+                    }
+                });
+                let result = origMethod.apply(this, args);
+                return result;
             }
-          }
-        });
-        let result = origMethod.apply(this, args);
-        return result;
-      }
+        };
+        return descriptor;
     };
-    return descriptor;
-  };
 }
 
 export interface ToUnitParameterMetadata {
-  toUnit: UnitOfMeasure;
-  precision?: number;
+    toUnit: UnitOfMeasure;
+    precision?: number;
 }
 
 /**
  * This is a parameter decorator, so that individual method params can be converted to different units of measure.
  *
  * @param toUnit - the unit to convert to
- * @param precision - optional precision
+ * @param precision - optional precision, which can be overridden by the parameter itself
  *
  * Note that parameter decorators can't make any changes themselves, we have to preserve info from the decorator as metadata,
- * which can then be used by the method decorator in order to use it for doing the conversion(s)
+ * which can then be used by the method decorator in order to use it for doing the conversion(s).
  *
  * See https://www.typescriptlang.org/docs/handbook/decorators.html#parameter-decorators
  */
-export function ToUnit(toUnit: UnitOfMeasure, precision?: number): Function {
-  return (
-    target: Object,
-    propertyName: string | symbol, //this is not the parameter name, but rather the method (aka property) name on the target object
-    parameterIndex: number,
-  ) => {
-    //in the case of a property rather than parameter being decorated
-    if (parameterIndex === undefined) {
-      parameterIndex = 0;
-    }
-    /**
-     * Parameter decorators are applied in reverse order (starting from highest parameter number), so the first time through, we need to create an empty array of objects, to
-     * preserve the decorator info in the form of metadata, which we can then refer to in the method decorator where the conversion is actually done. Since we don't have access
-     * to the parameter names, we have to rely on array index position.
-     */
-    const toUnitParamMetadata: ToUnitParameterMetadata[] =
-      Reflect.getOwnMetadata(converterDecorators, target, propertyName) ||
-      Array.from(new Array(parameterIndex + 1), (element, index) => {
-        return {};
-      });
-    Reflect.defineMetadata(converterDecorators, toUnitParamMetadata, target, propertyName);
-    if (toUnitParamMetadata[parameterIndex]) {
-      toUnitParamMetadata[parameterIndex].toUnit = toUnit;
-      if (precision == undefined) {
-        precision = defaultPrecision;
-      }
-      toUnitParamMetadata[parameterIndex].precision = precision;
-      Reflect.defineMetadata(converterDecorators, toUnitParamMetadata, target, propertyName);
-    }
-  };
+export function ToUnit(toUnit: UnitOfMeasure, precision: number = defaultPrecision): Function {
+    return (
+        target: Object,
+        propertyName: string | symbol, //this is not the parameter name, but rather the method (aka property) name on the target object
+        parameterIndex: number,
+    ) => {
+        //in the case of a property rather than parameter being decorated
+        if (parameterIndex === undefined) {
+            parameterIndex = 0;
+        }
+        /**
+         * Parameter decorators are applied in reverse order (starting from highest parameter number), so the first time through, we need to create an empty array of objects, to
+         * preserve the decorator info in the form of metadata, which we can then refer to in the method decorator where the conversion is actually done. Since we don't have access
+         * to the parameter names, we have to rely on array index position.
+         */
+        const toUnitParamMetadata: ToUnitParameterMetadata[] =
+            Reflect.getOwnMetadata(converterDecorators, target, propertyName) ||
+            Array.from(new Array(parameterIndex + 1), (element, index) => {
+                return {};
+            });
+        Reflect.defineMetadata(converterDecorators, toUnitParamMetadata, target, propertyName);
+        if (toUnitParamMetadata[parameterIndex]) {
+            toUnitParamMetadata[parameterIndex].toUnit = toUnit;
+            toUnitParamMetadata[parameterIndex].precision = precision;
+            Reflect.defineMetadata(converterDecorators, toUnitParamMetadata, target, propertyName);
+        }
+    };
 }
 
 function convertOrigArgVal(toUnit: UnitOfMeasure, origArg: MeasuredValue, precision?: number): number | null {
-  const matchingConverter: ToUnitConverter | undefined = toUnitConverters.find(
-    (unitConverter) => unitConverter.toUnit === toUnit,
-  );
-  if (!matchingConverter) {
-    console.warn(`No matching converter found to convert from ${JSON.stringify(origArg)} to unit ${toUnit}`);
-    return typeof origArg.val === 'string' ? parseFloat(origArg.val) : origArg.val;
-  }
-  const matchingConvertFunction: FromUnitConverter | undefined = matchingConverter.converters.find(
-    (converter) => converter.fromUnit === origArg.unit,
-  );
-  if (!matchingConvertFunction) {
-    console.warn(
-      `No conversion function found in ${JSON.stringify(matchingConverter)} to convert from ${origArg.unit}`,
+    const matchingConverter: ToUnitConverter | undefined = toUnitConverters.find(
+        (unitConverter) => unitConverter.toUnit === toUnit,
     );
-    return typeof origArg.val === 'string' ? parseFloat(origArg.val) : origArg.val;
-  }
-  return matchingConvertFunction.convertFunction(origArg.val, precision);
+    if (!matchingConverter) {
+        console.warn(`No matching converter found to convert from ${JSON.stringify(origArg)} to unit ${toUnit}`);
+        return typeof origArg.value === 'string' ? parseFloat(origArg.value) : origArg.value;
+    }
+    const matchingConvertFunction: FromUnitConverter | undefined = matchingConverter.converters.find(
+        (converter) => converter.fromUnit === origArg.unit,
+    );
+    if (!matchingConvertFunction) {
+        console.warn(
+            `No conversion function found in ${JSON.stringify(matchingConverter)} to convert from ${origArg.unit}`,
+        );
+        return typeof origArg.value === 'string' ? parseFloat(origArg.value) : origArg.value;
+    }
+    return matchingConvertFunction.convertFunction(origArg.value, precision);
 }
