@@ -19,7 +19,7 @@ import 'reflect-metadata';
  */
 
 const defaultPrecision = 2;
-const converterDecorators = Symbol('ToUnit');
+const toUnitDecoratorName = Symbol('ToUnit');
 
 /**
  * This is a method decorator, to determine which parameters have ToUnit decorators, and do the conversion. This
@@ -33,7 +33,7 @@ export function ConvertUnits(): Function {
             if (origMethod !== undefined) {
                 // getting the metadata that was set up in ToUnit
                 const toUnitParamMetadata: ToUnitParameterMetadata[] =
-                    Reflect.getOwnMetadata(converterDecorators, target, propertyName) || [];
+                    Reflect.getOwnMetadata(toUnitDecoratorName, target, propertyName) || [];
                 // match up the decorated parameters, with the arguments passed into this method
                 toUnitParamMetadata.forEach((paramMetadata, index, toUnitParamMetadata) => {
                     const origArg = args[index];
@@ -88,15 +88,15 @@ export function ToUnit(toUnit: UnitOfMeasure, precision: number = defaultPrecisi
          * to the parameter names, we have to rely on array index position.
          */
         const toUnitParamMetadata: ToUnitParameterMetadata[] =
-            Reflect.getOwnMetadata(converterDecorators, target, propertyName) ||
+            Reflect.getOwnMetadata(toUnitDecoratorName, target, propertyName) ||
             Array.from(new Array(parameterIndex + 1), (element, index) => {
                 return {};
             });
-        Reflect.defineMetadata(converterDecorators, toUnitParamMetadata, target, propertyName);
+        Reflect.defineMetadata(toUnitDecoratorName, toUnitParamMetadata, target, propertyName);
         if (toUnitParamMetadata[parameterIndex]) {
             toUnitParamMetadata[parameterIndex].toUnit = toUnit;
             toUnitParamMetadata[parameterIndex].precision = precision;
-            Reflect.defineMetadata(converterDecorators, toUnitParamMetadata, target, propertyName);
+            Reflect.defineMetadata(toUnitDecoratorName, toUnitParamMetadata, target, propertyName);
         }
     };
 }
